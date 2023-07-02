@@ -76,17 +76,18 @@ fn main() -> anyhow::Result<()> {
 	};
 
 	let output_data_fn = move |data: &mut [f32], _: &OutputCallbackInfo| {
-		let mut fell_behind = false;
-		for sample in data {
-			*sample = match consumer.pop() {
-				Some(s) => s,
-				None => {
-					fell_behind = true;
-					0.0
-				}
-			}
-		}
-		if fell_behind {
+		if data
+			.iter_mut()
+			.map(|sample| {
+				let (val, success) = match consumer.pop() {
+					Some(s) => (s, true),
+					None => (0.0, false),
+				};
+				*sample = val;
+				success
+			})
+			.any(|ok| !ok)
+		{
 			eprintln!("input stream fell behind. need to increase latency");
 		}
 	};
